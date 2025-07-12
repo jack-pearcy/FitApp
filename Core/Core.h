@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <ctime>
+#include "sqlite3.h"
 
 namespace Core {
 
@@ -17,6 +18,7 @@ namespace Core {
             const std::string& pwdHash,
             const std::string& salt);
 
+		// getters and setters
         const std::string& getUserName() const { return userName; }
         const std::string& getPassword() const { return password; }
         void addWeightEntry(const weightEntry& entry) {
@@ -26,6 +28,7 @@ namespace Core {
             return weightEntries;
         }
 
+		//private member variables
     private:
         std::string userName;
         std::string password;
