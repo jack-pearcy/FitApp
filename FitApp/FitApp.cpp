@@ -3,6 +3,11 @@
 
 #include "framework.h"
 #include "FitApp.h"
+#include <string>
+#include <openssl/evp.h>
+#include <openssl/rand.h>
+#include "Core.h"
+
 
 #define MAX_LOADSTRING 100
 
@@ -17,6 +22,8 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    SignUpDlgProc(HWND, UINT, WPARAM, LPARAM);
+std::string GenerateSaltFunction();
+std::string HashPasswordFunction(const WCHAR* password, const std::string& salt);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -148,7 +155,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case 2: // Sign Up button
                 // 1. Show dialog to get username/password
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_SIGNUP), hWnd, SignUpDlgProc);
-                // 2. Create user object
+                // 2. Create user object -> next window will be user stats
                 // 3. Insert user into SQLite database
                 break;
             case IDM_ABOUT:
@@ -199,6 +206,53 @@ INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
     return (INT_PTR)FALSE;
 }
 
+// Function to generate a salt
+std::string GenerateSaltFunction()
+{
+    unsigned char salt[16];
+    if (RAND_bytes(salt, sizeof(salt)) != 1) {
+        // Handle error
+        return "";
+    }
+    // Convert to hex string
+    std::string saltStr;
+    char buf[3];
+    for (int i = 0; i < sizeof(salt); ++i) {
+        sprintf(buf, "%02x", salt[i]);
+        saltStr += buf;
+    }
+    return saltStr;
+}
+
+// Function to hash a password with a salt
+std::string HashPasswordFunction(const WCHAR* password, const std::string& salt)
+{
+    // Convert WCHAR* password to UTF-8 std::string
+    int len = WideCharToMultiByte(CP_UTF8, 0, password, -1, nullptr, 0, nullptr, nullptr);
+    std::string pwdUtf8(len, 0);
+    WideCharToMultiByte(CP_UTF8, 0, password, -1, &pwdUtf8[0], len, nullptr, nullptr);
+
+    std::string saltedPwd = pwdUtf8 + salt;
+
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int hashLen;
+
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr);
+    EVP_DigestUpdate(ctx, saltedPwd.c_str(), saltedPwd.size());
+    EVP_DigestFinal_ex(ctx, hash, &hashLen);
+    EVP_MD_CTX_free(ctx);
+
+    // Convert hash to hex string
+    std::string hashStr;
+    char buf[3];
+    for (unsigned int i = 0; i < hashLen; ++i) {
+        sprintf(buf, "%02x", hash[i]);
+        hashStr += buf;
+    }
+    return hashStr;
+}
+
 // Dialog procedure for signup
 INT_PTR CALLBACK SignUpDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -211,7 +265,18 @@ INT_PTR CALLBACK SignUpDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             GetDlgItemText(hDlg, IDC_USERNAME_EDIT, username, 100);
             GetDlgItemText(hDlg, IDC_PASSWORD_EDIT, password, 100);
 
-            // TODO: Use username and password (e.g., create User object, store in SQLite)
+            // Convert username to std::wstring
+            std::wstring userNameW(username);
+
+            // Generate salt and hash password
+            std::string salt = GenerateSaltFunction();
+            std::string pwdHash = HashPasswordFunction(password, salt);
+
+            // Create User object
+            Core::User newUser(userNameW, pwdHash, salt);
+
+            // Insert into SQLite (implement this function in Core)
+            InsertUserToDatabase(newUser);
 
             EndDialog(hDlg, IDOK);
             return (INT_PTR)TRUE;
@@ -225,3 +290,6 @@ INT_PTR CALLBACK SignUpDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
     }
     return (INT_PTR)FALSE;
 }
+
+
+
