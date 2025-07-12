@@ -125,12 +125,28 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
+    case WM_CREATE:
+        {
+            CreateWindowW(L"BUTTON", L"Sign In",
+                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+                50, 100, 100, 30, hWnd, (HMENU)1, hInst, NULL);
+
+            CreateWindowW(L"BUTTON", L"Sign Up",
+                WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
+                200, 100, 100, 30, hWnd, (HMENU)2, hInst, NULL);
+        }
+        break;
     case WM_COMMAND:
         {
             int wmId = LOWORD(wParam);
-            // Parse the menu selections:
             switch (wmId)
             {
+            case 1: // Sign In button
+                // Handle sign in logic here
+                break;
+            case 2: // Sign Up button
+                // Handle sign up logic here
+                break;
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
                 break;
