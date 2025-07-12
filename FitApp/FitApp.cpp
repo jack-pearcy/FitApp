@@ -145,7 +145,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 // Handle sign in logic here
                 break;
             case 2: // Sign Up button
-                // Handle sign up logic here
+                // 1. Show dialog to get username/password
+                // 2. Create user object
+                // 3. Insert user into SQLite database
                 break;
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
