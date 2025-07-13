@@ -14,11 +14,13 @@ namespace Core {
 
 	class User {
 	public:
-		User(const std::string& userName, const std::string& email, const std::string& password)
-			: name(userName), email(email), password(password) {}
-		const std::string& getName() const { return name; }
-		const std::string& getEmail() const { return email; }
-		const std::string& getPassword() const { return password; }
+		// Constructor matching the argument list
+		User(const std::wstring& userName, const std::string& passwordHash, const std::string& salt) 
+			: userName(userName), passwordHash(passwordHash), salt(salt) {}
+
+		const std::wstring& getName() const { return userName; }
+		const std::string& getPasswordHash() const { return passwordHash; }
+		const std::string& getSalt() const { return salt; }
 		void addWeightEntry(const weightEntry& entry) {
 			weightEntries.push_back(entry);
 		}
@@ -26,9 +28,9 @@ namespace Core {
 			return weightEntries;
 		}
 	private:
-		std::string name;
-		std::string email;
-		std::string password;
+		std::wstring userName;
+		std::string passwordHash;
+		std::string salt;
 		std::vector<weightEntry> weightEntries;
 	};
 
@@ -49,5 +51,7 @@ namespace Core {
 			return false;
 		}
 
-		sqlite3_bind_text(stmt, 1, user.getName().c_str(), -1, SQLITE_TRANSIENT);
-		sqlite3_bind_text(stmt, 2, user.getEmail().c_str
+		sqlite3_bind_text(stmt, 1, reinterpret_cast<const char*>(user.getName().c_str()), -1, SQLITE_TRANSIENT);
+		sqlite3_bind_text(stmt, 3, user.getPasswordHash().c_str(), -1, SQLITE_TRANSIENT);
+	}
+}

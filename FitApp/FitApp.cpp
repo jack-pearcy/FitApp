@@ -7,6 +7,9 @@
 #include <openssl/evp.h>
 #include <openssl/rand.h>
 #include "Core.h"
+#include <sqlite3.h> // Ensure SQLite header is included
+#include <codecvt>
+#include <locale>
 
 
 #define MAX_LOADSTRING 100
@@ -218,7 +221,7 @@ std::string GenerateSaltFunction()
     std::string saltStr;
     char buf[3];
     for (int i = 0; i < sizeof(salt); ++i) {
-        sprintf(buf, "%02x", salt[i]);
+        sprintf_s(buf, "%02x", salt[i]);
         saltStr += buf;
     }
     return saltStr;
@@ -247,7 +250,7 @@ std::string HashPasswordFunction(const WCHAR* password, const std::string& salt)
     std::string hashStr;
     char buf[3];
     for (unsigned int i = 0; i < hashLen; ++i) {
-        sprintf(buf, "%02x", hash[i]);
+        sprintf_s(buf, "%02x", hash[i]);
         hashStr += buf;
     }
     return hashStr;
@@ -265,8 +268,10 @@ INT_PTR CALLBACK SignUpDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             GetDlgItemText(hDlg, IDC_USERNAME_EDIT, username, 100);
             GetDlgItemText(hDlg, IDC_PASSWORD_EDIT, password, 100);
 
-            // Convert username to std::wstring
+            // Convert username to UTF-8 std::string
             std::wstring userNameW(username);
+            std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
+            std::string userNameUtf8 = conv.to_bytes(userNameW);
 
             // Generate salt and hash password
             std::string salt = GenerateSaltFunction();
@@ -275,8 +280,25 @@ INT_PTR CALLBACK SignUpDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             // Create User object
             Core::User newUser(userNameW, pwdHash, salt);
 
-            // Insert into SQLite (implement this function in Core)
-            InsertUserToDatabase(newUser);
+            // Insert into SQLite database
+            sqlite3* db;
+            sqlite3_stmt* stmt; // Declare stmt
+            int rc = sqlite3_open("FitApp.db", &db);
+            if (rc == SQLITE_OK)
+            {
+                const char* sql = "INSERT INTO Users (Username, Password, Salt) VALUES (?, ?, ?);";
+                rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+                if (rc == SQLITE_OK)
+                {
+                    sqlite3_bind_text(stmt, 1, userNameUtf8.c_str(), -1, SQLITE_TRANSIENT);
+                    sqlite3_bind_text(stmt, 2, pwdHash.c_str(), -1, SQLITE_TRANSIENT);
+                    sqlite3_bind_text(stmt, 3, salt.c_str(), -1, SQLITE_TRANSIENT);
+
+                    sqlite3_step(stmt);
+                    sqlite3_finalize(stmt);
+                }
+                sqlite3_close(db);
+            }
 
             EndDialog(hDlg, IDOK);
             return (INT_PTR)TRUE;
