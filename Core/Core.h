@@ -5,7 +5,10 @@
 #include <ctime>
 #include <sqlite3.h>
 
+void fnCore();
+
 namespace Core {
+
 
 	struct weightEntry {
 		double weightLbs;
@@ -37,7 +40,7 @@ namespace Core {
 	// Function to insert a user into the SQLite database
 	inline bool InsertUserToDatabase(const User& user) {
 		sqlite3* db;
-		int rc = sqlite3_open("fitapp.db", &db);
+		int rc = sqlite3_open("FitApp.db", &db);
 		if (rc != SQLITE_OK) {
 			sqlite3_close(db);
 			return false;
