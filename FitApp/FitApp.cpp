@@ -10,9 +10,15 @@
 #include <sqlite3.h> // Ensure SQLite header is included
 #include <codecvt>
 #include <locale>
-
+#include <Windows.h>
+#include <commctrl.h> // Needed for slider/trackbar
+#include <cmath> // For round function
 
 #define MAX_LOADSTRING 100
+
+// Use inches for everything in the UI
+#define MIN_HEIGHT_INCHES 39   // 3 ft 3 in
+#define MAX_HEIGHT_INCHES 84   // 7 ft 0 in
 
 // Global Variables:
 HINSTANCE hInst;                                // current instance
@@ -25,8 +31,10 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    SignUpDlgProc(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK UserStatsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 std::string GenerateSaltFunction();
 std::string HashPasswordFunction(const WCHAR* password, const std::string& salt);
+void DisplayHeightFeetInches(HWND hDlg, int inches);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -156,11 +164,16 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 // Handle sign in logic here
                 break;
             case 2: // Sign Up button
-                // 1. Show dialog to get username/password
-                DialogBox(hInst, MAKEINTRESOURCE(IDD_SIGNUP), hWnd, SignUpDlgProc);
-                // 2. Create user object -> next window will be user stats
-                // 3. Insert user into SQLite database
+            {
+                // Show sign-up dialog
+                INT_PTR result = DialogBox(hInst, MAKEINTRESOURCE(IDD_SIGNUP), hWnd, SignUpDlgProc);
+                if (result == IDOK) {
+                    // If sign-up was successful, show user stats dialog
+                    DialogBox(hInst, MAKEINTRESOURCE(IDD_USERSTATS), hWnd, UserStatsDlgProc);
+                }
+                // User cancelled or closed dialog: do nothing
                 break;
+            }
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
                 break;
@@ -256,6 +269,16 @@ std::string HashPasswordFunction(const WCHAR* password, const std::string& salt)
     return hashStr;
 }
 
+// Helper function to convert inches to feet/inches
+void DisplayHeightFeetInches(HWND hDlg, int inches)
+{
+    int feet = inches / 12;
+    int remInches = inches % 12;
+    WCHAR buf[32];
+    swprintf(buf, 32, L"%d ft %d in", feet, remInches);
+    SetDlgItemText(hDlg, IDC_HEIGHT_DISPLAY, buf);
+}
+
 // Dialog procedure for signup
 INT_PTR CALLBACK SignUpDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -312,6 +335,44 @@ INT_PTR CALLBACK SignUpDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
     }
     return (INT_PTR)FALSE;
 }
+
+// Dialog procedure for user stats
+INT_PTR CALLBACK UserStatsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_INITDIALOG:
+        {
+            HWND hSlider = GetDlgItem(hDlg, IDC_HEIGHT_SLIDER);
+            SendMessage(hSlider, TBM_SETRANGE, TRUE, MAKELPARAM(MIN_HEIGHT_INCHES, MAX_HEIGHT_INCHES));
+            SendMessage(hSlider, TBM_SETPOS, TRUE, 66); // Default to 5'6"
+            DisplayHeightFeetInches(hDlg, 66); // Initial display
+        }
+        return (INT_PTR)TRUE;
+
+    case WM_HSCROLL:
+        {
+            HWND hSlider = GetDlgItem(hDlg, IDC_HEIGHT_SLIDER);
+            if ((HWND)lParam == hSlider)
+            {
+                int inches = (int)SendMessage(hSlider, TBM_GETPOS, 0, 0);
+                DisplayHeightFeetInches(hDlg, inches);
+            }
+        }
+        break;
+
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+        {
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
+        break;
+    }
+    return (INT_PTR)FALSE;
+}
+
+
 
 
 
