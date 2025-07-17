@@ -24,6 +24,7 @@
 HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
+std::string g_userNameUtf8;                     // Global variable for username in UTF-8
 
 // Forward declarations of functions included in this code module:
 ATOM                MyRegisterClass(HINSTANCE hInstance);
@@ -35,6 +36,7 @@ INT_PTR CALLBACK UserStatsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
 std::string GenerateSaltFunction();
 std::string HashPasswordFunction(const WCHAR* password, const std::string& salt);
 void DisplayHeightFeetInches(HWND hDlg, int inches);
+void SaveUserStatsToDB(const std::string& username, int heightInches);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -169,7 +171,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 INT_PTR result = DialogBox(hInst, MAKEINTRESOURCE(IDD_SIGNUP), hWnd, SignUpDlgProc);
                 if (result == IDOK) {
                     // If sign-up was successful, show user stats dialog
-                    DialogBox(hInst, MAKEINTRESOURCE(IDD_USERSTATS), hWnd, UserStatsDlgProc);
+                    DialogBoxParam(hInst, MAKEINTRESOURCE(IDD_USERSTATS), hWnd, UserStatsDlgProc, (LPARAM)g_userNameUtf8.c_str());
                 }
                 // User cancelled or closed dialog: do nothing
                 break;
@@ -279,6 +281,28 @@ void DisplayHeightFeetInches(HWND hDlg, int inches)
     SetDlgItemText(hDlg, IDC_HEIGHT_DISPLAY, buf);
 }
 
+// Function to save user stats to the database
+void SaveUserStatsToDB(const std::string& username, int heightInches)
+{
+    sqlite3* db;
+    sqlite3_stmt* stmt;
+    int rc = sqlite3_open("FitApp.db", &db);
+    if (rc == SQLITE_OK)
+    {
+        const char* sql = "UPDATE Users SET Height = ? WHERE Username = ?;";
+        rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+        if (rc == SQLITE_OK)
+        {
+            sqlite3_bind_int(stmt, 1, heightInches);
+            sqlite3_bind_text(stmt, 2, username.c_str(), -1, SQLITE_TRANSIENT);
+
+            sqlite3_step(stmt);
+            sqlite3_finalize(stmt);
+        }
+        sqlite3_close(db);
+    }
+}
+
 // Dialog procedure for signup
 INT_PTR CALLBACK SignUpDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -294,7 +318,7 @@ INT_PTR CALLBACK SignUpDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             // Convert username to UTF-8 std::string
             std::wstring userNameW(username);
             std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
-            std::string userNameUtf8 = conv.to_bytes(userNameW);
+            g_userNameUtf8 = conv.to_bytes(userNameW);
 
             // Generate salt and hash password
             std::string salt = GenerateSaltFunction();
@@ -313,7 +337,7 @@ INT_PTR CALLBACK SignUpDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
                 rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
                 if (rc == SQLITE_OK)
                 {
-                    sqlite3_bind_text(stmt, 1, userNameUtf8.c_str(), -1, SQLITE_TRANSIENT);
+                    sqlite3_bind_text(stmt, 1, g_userNameUtf8.c_str(), -1, SQLITE_TRANSIENT);
                     sqlite3_bind_text(stmt, 2, pwdHash.c_str(), -1, SQLITE_TRANSIENT);
                     sqlite3_bind_text(stmt, 3, salt.c_str(), -1, SQLITE_TRANSIENT);
 
@@ -362,9 +386,24 @@ INT_PTR CALLBACK UserStatsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
         break;
 
     case WM_COMMAND:
-        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+        if (LOWORD(wParam) == IDOK)
         {
-            EndDialog(hDlg, LOWORD(wParam));
+            // Get the height value from the slider
+            HWND hSlider = GetDlgItem(hDlg, IDC_HEIGHT_SLIDER);
+            int heightInches = (int)SendMessage(hSlider, TBM_GETPOS, 0, 0);
+
+            // Get the username from global variable
+            std::string username = g_userNameUtf8;
+
+            // Save stats to database
+            SaveUserStatsToDB(username, heightInches);
+
+            EndDialog(hDlg, IDOK);
+            return (INT_PTR)TRUE;
+        }
+        else if (LOWORD(wParam) == IDCANCEL)
+        {
+            EndDialog(hDlg, IDCANCEL);
             return (INT_PTR)TRUE;
         }
         break;

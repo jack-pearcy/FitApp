@@ -9,25 +9,28 @@
 // This is a library function
 void fnCore()
 {
-    // SQL statement to create the 'users' table if it doesn't exist.
-    // 'username' is the primary key, 'password' and 'salt' are required fields.
-    const char* createTableSQL =
+    // Create 'users' table
+    const char* createUsersTableSQL =
         "CREATE TABLE IF NOT EXISTS users ("
         "username TEXT PRIMARY KEY, "
         "password TEXT NOT NULL, "
         "salt TEXT NOT NULL"
         ");";
 
-    sqlite3* db; // Pointer to the SQLite database connection.
+    // Create 'userstats' table
+    const char* createUserStatsTableSQL =
+        "CREATE TABLE IF NOT EXISTS userstats ("
+        "username TEXT PRIMARY KEY, "
+        "height_in INTEGER, "
+        // Add more stats fields as needed
+        "FOREIGN KEY(username) REFERENCES users(username)"
+        ");";
 
-    // Opens (or creates) the database file 'example.db'.
-    // If the file doesn't exist, SQLite will create it.
+    sqlite3* db;
     sqlite3_open("FitApp.db", &db);
 
-    // Executes the SQL statement to create the table.
-    // No callback function is used (nullptr), so results are ignored.
-    sqlite3_exec(db, createTableSQL, nullptr, nullptr, nullptr);
+    sqlite3_exec(db, createUsersTableSQL, nullptr, nullptr, nullptr);
+    sqlite3_exec(db, createUserStatsTableSQL, nullptr, nullptr, nullptr);
 
-    // Closes the database connection, freeing resources.
     sqlite3_close(db);
 }
