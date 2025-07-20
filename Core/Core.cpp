@@ -9,7 +9,14 @@
 // This is a library function
 void fnCore()
 {
-    // Create 'users' table
+    sqlite3* db;
+    sqlite3_open("FitApp.db", &db);
+
+    // Drop tables first to remove old schema and data
+    sqlite3_exec(db, "DROP TABLE IF EXISTS userstats;", nullptr, nullptr, nullptr);
+    sqlite3_exec(db, "DROP TABLE IF EXISTS users;", nullptr, nullptr, nullptr);
+
+    // Now create tables with the new schema
     const char* createUsersTableSQL =
         "CREATE TABLE IF NOT EXISTS users ("
         "username TEXT PRIMARY KEY, "
@@ -17,17 +24,13 @@ void fnCore()
         "salt TEXT NOT NULL"
         ");";
 
-    // Create 'userstats' table
     const char* createUserStatsTableSQL =
         "CREATE TABLE IF NOT EXISTS userstats ("
-        "username TEXT PRIMARY KEY, "
-        "height_in INTEGER, "
-        // Add more stats fields as needed
-        "FOREIGN KEY(username) REFERENCES users(username)"
+        "User TEXT PRIMARY KEY, "
+        "Height INTEGER, "
+        "Weight INTEGER, "
+        "FOREIGN KEY(User) REFERENCES users(username)"
         ");";
-
-    sqlite3* db;
-    sqlite3_open("FitApp.db", &db);
 
     sqlite3_exec(db, createUsersTableSQL, nullptr, nullptr, nullptr);
     sqlite3_exec(db, createUserStatsTableSQL, nullptr, nullptr, nullptr);

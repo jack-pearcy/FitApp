@@ -36,7 +36,7 @@ INT_PTR CALLBACK UserStatsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
 std::string GenerateSaltFunction();
 std::string HashPasswordFunction(const WCHAR* password, const std::string& salt);
 void DisplayHeightFeetInches(HWND hDlg, int inches);
-void SaveUserStatsToDB(const std::string& username, int heightInches);
+void SaveUserStatsToDB(const std::string& username, int height, int weight);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -282,23 +282,26 @@ void DisplayHeightFeetInches(HWND hDlg, int inches)
 }
 
 // Function to save user stats to the database
-void SaveUserStatsToDB(const std::string& username, int heightInches)
+void SaveUserStatsToDB(const std::string& username, int height, int weight)
 {
     sqlite3* db;
     sqlite3_stmt* stmt;
     int rc = sqlite3_open("FitApp.db", &db);
     if (rc == SQLITE_OK)
     {
-        const char* sql = "UPDATE Users SET Height = ? WHERE Username = ?;";
-        rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+        // Insert into userstats table with Username, Height, Weight
+        const char* sqlInsert = "INSERT INTO userstats (Username, Height, Weight) VALUES (?, ?, ?);";
+        rc = sqlite3_prepare_v2(db, sqlInsert, -1, &stmt, nullptr);
         if (rc == SQLITE_OK)
         {
-            sqlite3_bind_int(stmt, 1, heightInches);
-            sqlite3_bind_text(stmt, 2, username.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int(stmt, 2, height);
+            sqlite3_bind_int(stmt, 3, weight);
 
             sqlite3_step(stmt);
             sqlite3_finalize(stmt);
         }
+
         sqlite3_close(db);
     }
 }
@@ -392,11 +395,14 @@ INT_PTR CALLBACK UserStatsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
             HWND hSlider = GetDlgItem(hDlg, IDC_HEIGHT_SLIDER);
             int heightInches = (int)SendMessage(hSlider, TBM_GETPOS, 0, 0);
 
+            // Get the weight value from the edit box
+            int weight = GetDlgItemInt(hDlg, IDC_EDIT3, NULL, FALSE);
+
             // Get the username from global variable
             std::string username = g_userNameUtf8;
 
             // Save stats to database
-            SaveUserStatsToDB(username, heightInches);
+            SaveUserStatsToDB(username, heightInches, weight);
 
             EndDialog(hDlg, IDOK);
             return (INT_PTR)TRUE;
