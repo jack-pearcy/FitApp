@@ -13,6 +13,7 @@
 #include <Windows.h>
 #include <commctrl.h> // Needed for slider/trackbar
 #include <cmath> // For round function
+#include <cstdio> // For printf
 
 #define MAX_LOADSTRING 100
 
@@ -287,23 +288,39 @@ void SaveUserStatsToDB(const std::string& username, int height, int weight)
     sqlite3* db;
     sqlite3_stmt* stmt;
     int rc = sqlite3_open("FitApp.db", &db);
-    if (rc == SQLITE_OK)
-    {
-        // Insert into userstats table with Username, Height, Weight
-        const char* sqlInsert = "INSERT INTO userstats (Username, Height, Weight) VALUES (?, ?, ?);";
-        rc = sqlite3_prepare_v2(db, sqlInsert, -1, &stmt, nullptr);
-        if (rc == SQLITE_OK)
-        {
-            sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
-            sqlite3_bind_int(stmt, 2, height);
-            sqlite3_bind_int(stmt, 3, weight);
-
-            sqlite3_step(stmt);
-            sqlite3_finalize(stmt);
-        }
-
-        sqlite3_close(db);
+    
+    if (rc != SQLITE_OK) {
+        OutputDebugStringA("Failed to open database\n");
+        return;
     }
+    
+    // Insert into userstats table with proper error handling
+    const char* sqlInsert = "INSERT INTO Userstats (Username, Height, Weight) VALUES (?, ?, ?);";
+    rc = sqlite3_prepare_v2(db, sqlInsert, -1, &stmt, nullptr);
+    
+    if (rc != SQLITE_OK) {
+        char errMsg[256];
+        sprintf_s(errMsg, "SQL prepare error: %s\n", sqlite3_errmsg(db));
+        OutputDebugStringA(errMsg);
+        sqlite3_close(db);
+        return;
+    }
+    
+    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(stmt, 2, height);
+    sqlite3_bind_int(stmt, 3, weight);
+    
+    rc = sqlite3_step(stmt);
+    if (rc != SQLITE_DONE) {
+        char errMsg[256];
+        sprintf_s(errMsg, "SQL insert error: %s\n", sqlite3_errmsg(db));
+        OutputDebugStringA(errMsg);
+    } else {
+        OutputDebugStringA("Successfully inserted into Userstats table\n");
+    }
+    
+    sqlite3_finalize(stmt);
+    sqlite3_close(db);
 }
 
 // Dialog procedure for signup

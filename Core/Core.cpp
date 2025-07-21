@@ -13,23 +13,23 @@ void fnCore()
     sqlite3_open("FitApp.db", &db);
 
     // Drop tables first to remove old schema and data
-    sqlite3_exec(db, "DROP TABLE IF EXISTS userstats;", nullptr, nullptr, nullptr);
-    sqlite3_exec(db, "DROP TABLE IF EXISTS users;", nullptr, nullptr, nullptr);
+     sqlite3_exec(db, "DROP TABLE IF EXISTS userstats;", nullptr, nullptr, nullptr);
+     sqlite3_exec(db, "DROP TABLE IF EXISTS users;", nullptr, nullptr, nullptr);
 
     // Now create tables with the new schema
     const char* createUsersTableSQL =
-        "CREATE TABLE IF NOT EXISTS users ("
-        "username TEXT PRIMARY KEY, "
+        "CREATE TABLE IF NOT EXISTS Users ("
+        "Username TEXT PRIMARY KEY, "
         "password TEXT NOT NULL, "
         "salt TEXT NOT NULL"
         ");";
 
     const char* createUserStatsTableSQL =
-        "CREATE TABLE IF NOT EXISTS userstats ("
-        "User TEXT PRIMARY KEY, "
+        "CREATE TABLE IF NOT EXISTS Userstats ("
+        "Username TEXT PRIMARY KEY, "
         "Height INTEGER, "
         "Weight INTEGER, "
-        "FOREIGN KEY(User) REFERENCES users(username)"
+        "FOREIGN KEY(Username) REFERENCES Users(Username)"
         ");";
 
     sqlite3_exec(db, createUsersTableSQL, nullptr, nullptr, nullptr);

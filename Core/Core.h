@@ -4,6 +4,8 @@
 #include <vector>
 #include <ctime>
 #include <sqlite3.h>
+#include <locale>
+#include <codecvt>
 
 void fnCore();
 
@@ -46,7 +48,7 @@ namespace Core {
 			return false;
 		}
 
-		const char* sql = "INSERT INTO users (username, email, password) VALUES (?, ?, ?);";
+		const char* sql = "INSERT INTO Users (Username, Password, Salt) VALUES (?, ?, ?);";
 		sqlite3_stmt* stmt;
 		rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
 		if (rc != SQLITE_OK) {
@@ -54,7 +56,18 @@ namespace Core {
 			return false;
 		}
 
-		sqlite3_bind_text(stmt, 1, reinterpret_cast<const char*>(user.getName().c_str()), -1, SQLITE_TRANSIENT);
-		sqlite3_bind_text(stmt, 3, user.getPasswordHash().c_str(), -1, SQLITE_TRANSIENT);
+		// Convert wstring to UTF-8 string for database
+		std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
+		std::string usernameUtf8 = conv.to_bytes(user.getName());
+
+		sqlite3_bind_text(stmt, 1, usernameUtf8.c_str(), -1, SQLITE_TRANSIENT);
+		sqlite3_bind_text(stmt, 2, user.getPasswordHash().c_str(), -1, SQLITE_TRANSIENT);
+		sqlite3_bind_text(stmt, 3, user.getSalt().c_str(), -1, SQLITE_TRANSIENT);
+
+		rc = sqlite3_step(stmt);
+		sqlite3_finalize(stmt);
+		sqlite3_close(db);
+		
+		return (rc == SQLITE_DONE);
 	}
 }
