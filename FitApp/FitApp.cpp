@@ -32,6 +32,7 @@ ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    SignInDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 INT_PTR CALLBACK    SignUpDlgProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK UserStatsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 std::string GenerateSaltFunction();
@@ -164,7 +165,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             switch (wmId)
             {
             case 1: // Sign In button
-                // Handle sign in logic here
+                // Show sign-in dialog
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_SIGNIN), hWnd, SignInDlgProc);
                 break;
             case 2: // Sign Up button
             {
@@ -278,7 +280,7 @@ void DisplayHeightFeetInches(HWND hDlg, int inches)
     int feet = inches / 12;
     int remInches = inches % 12;
     WCHAR buf[32];
-    swprintf(buf, 32, L"%d ft %d in", feet, remInches);
+    swprintf(buf, 32, L"%d' %d\''", feet, remInches);
     SetDlgItemText(hDlg, IDC_HEIGHT_DISPLAY, buf);
 }
 
@@ -321,6 +323,167 @@ void SaveUserStatsToDB(const std::string& username, int height, int weight)
     
     sqlite3_finalize(stmt);
     sqlite3_close(db);
+}
+
+// Dialog procedure for sign in
+INT_PTR CALLBACK SignInDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_INITDIALOG:
+    {
+        // Debug: Dialog initialization
+        OutputDebugStringA("SignInDlgProc: WM_INITDIALOG triggered\n");
+
+        // Set focus to the username field so the user can start typing immediately
+        SetFocus(GetDlgItem(hDlg, IDC_SIGNINUNAME));
+        return (INT_PTR)TRUE; // Return TRUE to indicate successful initialization
+    }
+
+    case WM_COMMAND:
+    {
+        int wmId = LOWORD(wParam); // Extract the control ID from wParam
+        switch (wmId)
+        {
+        case IDOK: // Handle "OK" button click
+        {
+            // Debug: OK button clicked
+            OutputDebugStringA("SignInDlgProc: IDOK button clicked\n");
+
+            WCHAR username[100], password[100]; // Declare buffers for username and password
+            GetDlgItemText(hDlg, IDC_SIGNINUNAME, username, 100); // Retrieve text from the username field
+            GetDlgItemText(hDlg, IDC_SIGNINPASS, password, 100); // Retrieve text from the password field
+
+            // Debug: Retrieved username and password
+            OutputDebugStringA(("SignInDlgProc: Username: " + std::wstring_convert<std::codecvt_utf8<wchar_t>>().to_bytes(username) + "\n").c_str());
+            OutputDebugStringA("SignInDlgProc: Password retrieved\n");
+
+            // Validate input: Check if username or password fields are empty
+            if (wcslen(username) == 0 || wcslen(password) == 0)
+            {
+                // Debug: Empty fields detected
+                OutputDebugStringA("SignInDlgProc: Empty username or password detected\n");
+
+                // Show an error message if fields are empty
+                MessageBox(hDlg, L"Please enter both username and password.", L"Error", MB_OK | MB_ICONERROR);
+                return (INT_PTR)TRUE; // Return TRUE to indicate the message was handled
+            }
+
+            // Convert username from wide string to UTF-8 for database query
+            std::wstring_convert<std::codecvt_utf8<wchar_t>> conv; // Create a converter for wide strings
+            std::string usernameUtf8 = conv.to_bytes(username); // Convert the wide string to UTF-8
+
+            // Debug: Converted username to UTF-8
+            OutputDebugStringA(("SignInDlgProc: Username UTF-8: " + usernameUtf8 + "\n").c_str());
+
+            // Open the SQLite database
+            sqlite3* db; // Declare a pointer for the database connection
+            sqlite3_stmt* stmt; // Declare a pointer for the prepared statement
+            int rc = sqlite3_open("FitApp.db", &db); // Open the database file
+            if (rc != SQLITE_OK) // Check if the database connection failed
+            {
+                // Debug: Database connection failed
+                OutputDebugStringA("SignInDlgProc: Failed to connect to the database\n");
+
+                // Show an error message if the database connection failed
+                MessageBox(hDlg, L"Failed to connect to the database.", L"Error", MB_OK | MB_ICONERROR);
+                EndDialog(hDlg, IDCANCEL); // Close the dialog
+                return (INT_PTR)TRUE; // Return TRUE to indicate the message was handled
+            }
+
+            // Debug: Database connection successful
+            OutputDebugStringA("SignInDlgProc: Database connection successful\n");
+
+            // Prepare the SQL query to fetch the password hash and salt for the given username
+            const char* sql = "SELECT Password, Salt FROM Users WHERE Username = ?;";
+            rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr); // Prepare the SQL query
+            if (rc != SQLITE_OK) // Check if the query preparation failed
+            {
+                sqlite3_close(db); // Close the database connection
+
+                // Debug: Query preparation failed
+                OutputDebugStringA("SignInDlgProc: Failed to prepare database query\n");
+
+                // Show an error message if the query preparation failed
+                MessageBox(hDlg, L"Failed to prepare database query.", L"Error", MB_OK | MB_ICONERROR);
+                EndDialog(hDlg, IDCANCEL); // Close the dialog
+                return (INT_PTR)TRUE; // Return TRUE to indicate the message was handled
+            }
+
+            // Debug: Query preparation successful
+            OutputDebugStringA("SignInDlgProc: Query prepared successfully\n");
+
+            // Bind the username parameter to the SQL query
+            sqlite3_bind_text(stmt, 1, usernameUtf8.c_str(), -1, SQLITE_TRANSIENT);
+
+            std::string storedHash, storedSalt; // Declare variables to store the retrieved hash and salt
+            if (sqlite3_step(stmt) == SQLITE_ROW) // Execute the query and check if a row was returned
+            {
+                // Retrieve the password hash and salt from the query result
+                storedHash = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+                storedSalt = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+
+                // Debug: Retrieved hash and salt
+                OutputDebugStringA(("SignInDlgProc: Retrieved Hash: " + storedHash + "\n").c_str());
+                OutputDebugStringA(("SignInDlgProc: Retrieved Salt: " + storedSalt + "\n").c_str());
+            }
+            else // If no row was returned, the username does not exist
+            {
+                sqlite3_finalize(stmt); // Finalize the prepared statement
+                sqlite3_close(db); // Close the database connection
+
+                // Debug: Username not found
+                OutputDebugStringA("SignInDlgProc: Username not found in database\n");
+
+                // Show an error message if the username does not exist
+                MessageBox(hDlg, L"Invalid username or password.", L"Error", MB_OK | MB_ICONERROR);
+                return (INT_PTR)TRUE; // Return TRUE to indicate the message was handled
+            }
+
+            sqlite3_finalize(stmt); // Finalize the prepared statement
+            sqlite3_close(db); // Close the database connection
+
+            // Hash the entered password with the retrieved salt
+            std::string enteredHash = HashPasswordFunction(password, storedSalt);
+
+            // Debug: Computed entered hash
+            OutputDebugStringA(("SignInDlgProc: Computed Entered Hash: " + enteredHash + "\n").c_str());
+
+            // Compare the hashed password with the stored hash
+            if (enteredHash == storedHash) // If the hashes match, the credentials are valid
+            {
+                // Debug: Password verified successfully
+                OutputDebugStringA("SignInDlgProc: Password verified successfully\n");
+
+                // Show a success message
+                MessageBox(hDlg, L"Sign-in successful!", L"Success", MB_OK | MB_ICONINFORMATION);
+                EndDialog(hDlg, IDOK); // Close the dialog and return IDOK
+            }
+            else // If the hashes do not match, the credentials are invalid
+            {
+                // Debug: Password verification failed
+                OutputDebugStringA("SignInDlgProc: Password verification failed\n");
+
+                // Show an error message
+                MessageBox(hDlg, L"Invalid username or password.", L"Error", MB_OK | MB_ICONERROR);
+            }
+
+            return (INT_PTR)TRUE; // Return TRUE to indicate the message was handled
+        }
+
+        case IDCANCEL: // Handle "Cancel" button click
+        {
+            // Debug: Cancel button clicked
+            OutputDebugStringA("SignInDlgProc: IDCANCEL button clicked\n");
+
+            EndDialog(hDlg, IDCANCEL); // Close the dialog and return IDCANCEL
+            return (INT_PTR)TRUE; // Return TRUE to indicate the message was handled
+        }
+        }
+    }
+    break;
+    }
+    return (INT_PTR)FALSE; // Return FALSE for unhandled messages
 }
 
 // Dialog procedure for signup
