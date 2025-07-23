@@ -118,20 +118,33 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
-   hInst = hInstance; // Store instance handle in our global variable
+    hInst = hInstance; // Store instance handle in our global variable
 
-   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+    // Define desired window size
+    int windowWidth = 400;  // Width of the window
+    int windowHeight = 300; // Height of the window
 
-   if (!hWnd)
-   {
-      return FALSE;
-   }
+    // Get screen dimensions
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
+    // Calculate top-left corner to center the window
+    int xPos = (screenWidth - windowWidth) / 2;
+    int yPos = (screenHeight - windowHeight) / 2;
 
-   return TRUE;
+    // Create the window at the calculated position
+    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+                              xPos, yPos, windowWidth, windowHeight, nullptr, nullptr, hInstance, nullptr);
+
+    if (!hWnd)
+    {
+        return FALSE;
+    }
+
+    ShowWindow(hWnd, nCmdShow);
+    UpdateWindow(hWnd);
+
+    return TRUE;
 }
 
 //
@@ -337,7 +350,7 @@ INT_PTR CALLBACK SignInDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
 
         // Set focus to the username field so the user can start typing immediately
         SetFocus(GetDlgItem(hDlg, IDC_SIGNINUNAME));
-        return (INT_PTR)TRUE; // Return TRUE to indicate successful initialization
+        return (INT_PTR)FALSE; // Return TRUE to indicate successful initialization
     }
 
     case WM_COMMAND:
@@ -345,7 +358,7 @@ INT_PTR CALLBACK SignInDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
         int wmId = LOWORD(wParam); // Extract the control ID from wParam
         switch (wmId)
         {
-        case IDOK: // Handle "OK" button click
+        case IDC_SIGNINSUBMIT: // Handle "OK" button click
         {
             // Debug: OK button clicked
             OutputDebugStringA("SignInDlgProc: IDOK button clicked\n");
@@ -576,7 +589,7 @@ INT_PTR CALLBACK UserStatsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
             int heightInches = (int)SendMessage(hSlider, TBM_GETPOS, 0, 0);
 
             // Get the weight value from the edit box
-            int weight = GetDlgItemInt(hDlg, IDC_EDIT3, NULL, FALSE);
+            int weight = GetDlgItemInt(hDlg, IDC_WEIGHTINPUT, NULL, FALSE);
 
             // Get the username from global variable
             std::string username = g_userNameUtf8;
