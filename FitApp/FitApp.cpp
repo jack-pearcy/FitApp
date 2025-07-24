@@ -34,7 +34,8 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    SignInDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 INT_PTR CALLBACK    SignUpDlgProc(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK UserStatsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK    UserStatsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+INT_PTR CALLBACK    HomeScreenDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
 std::string GenerateSaltFunction();
 std::string HashPasswordFunction(const WCHAR* password, const std::string& salt);
 void DisplayHeightFeetInches(HWND hDlg, int inches);
@@ -163,6 +164,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
     {
     case WM_CREATE:
         {
+            // Create "Sign In" and "Sign Up" buttons
             CreateWindowW(L"BUTTON", L"Sign In",
                 WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
                 50, 100, 100, 30, hWnd, (HMENU)1, hInst, NULL);
@@ -172,48 +174,54 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 200, 100, 100, 30, hWnd, (HMENU)2, hInst, NULL);
         }
         break;
+
     case WM_COMMAND:
         {
             int wmId = LOWORD(wParam);
             switch (wmId)
             {
-            case 1: // Sign In button
-                // Show sign-in dialog
-                DialogBox(hInst, MAKEINTRESOURCE(IDD_SIGNIN), hWnd, SignInDlgProc);
+            case 1: // "Sign In" button
+                // Show the sign-in dialog
+                if (DialogBox(hInst, MAKEINTRESOURCE(IDD_SIGNIN), hWnd, SignInDlgProc) == IDC_SIGNINSUBMIT)
+                {
+                    // Hide the main window instead of destroying it
+                    ShowWindow(hWnd, SW_HIDE);
+                    
+                    // Launch home screen
+                    DialogBox(hInst, MAKEINTRESOURCE(IDD_HOMESCREEN), nullptr, HomeScreenDlgProc);
+                    
+                    // After home screen closes, show main window again
+                    ShowWindow(hWnd, SW_SHOW);
+                }
                 break;
-            case 2: // Sign Up button
-            {
-                // Show sign-up dialog
-                INT_PTR result = DialogBox(hInst, MAKEINTRESOURCE(IDD_SIGNUP), hWnd, SignUpDlgProc);
-                if (result == IDOK) {
-                    // If sign-up was successful, show user stats dialog
+
+            case 2: // "Sign Up" button
+                // Show the sign-up dialog
+                if (DialogBox(hInst, MAKEINTRESOURCE(IDD_SIGNUP), hWnd, SignUpDlgProc) == IDOK)
+                {
+                    // If sign-up is successful, show user stats dialog
                     DialogBoxParam(hInst, MAKEINTRESOURCE(IDD_USERSTATS), hWnd, UserStatsDlgProc, (LPARAM)g_userNameUtf8.c_str());
                 }
-                // User cancelled or closed dialog: do nothing
                 break;
-            }
+
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
                 break;
+
             case IDM_EXIT:
                 DestroyWindow(hWnd);
                 break;
+
             default:
                 return DefWindowProc(hWnd, message, wParam, lParam);
             }
         }
         break;
-    case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hWnd, &ps);
-            // TODO: Add any drawing code that uses hdc here...
-            EndPaint(hWnd, &ps);
-        }
-        break;
+
     case WM_DESTROY:
         PostQuitMessage(0);
         break;
+
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
     }
@@ -465,12 +473,12 @@ INT_PTR CALLBACK SignInDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lP
             // Compare the hashed password with the stored hash
             if (enteredHash == storedHash) // If the hashes match, the credentials are valid
             {
+                MessageBox(hDlg, L"Sign-in successful!", L"Success", MB_OK | MB_ICONINFORMATION);
+                EndDialog(hDlg, IDC_SIGNINSUBMIT); // Close the sign-in dialog
+
                 // Debug: Password verified successfully
                 OutputDebugStringA("SignInDlgProc: Password verified successfully\n");
-
-                // Show a success message
-                MessageBox(hDlg, L"Sign-in successful!", L"Success", MB_OK | MB_ICONINFORMATION);
-                EndDialog(hDlg, IDOK); // Close the dialog and return IDOK
+               
             }
             else // If the hashes do not match, the credentials are invalid
             {
@@ -610,6 +618,30 @@ INT_PTR CALLBACK UserStatsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM
     return (INT_PTR)FALSE;
 }
 
+INT_PTR CALLBACK HomeScreenDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_INITDIALOG:
+        // Initialize the home screen (e.g., load user data, set up controls)
+        SetDlgItemText(hDlg, IDC_STATIC, L"Welcome to FitApp!");
+        return (INT_PTR)TRUE;
+
+    case WM_COMMAND:
+        switch (LOWORD(wParam))
+        {
+        case IDC_LOGOUT: // Handle "Log Out" button click
+            EndDialog(hDlg, IDC_LOGOUT);
+            return (INT_PTR)TRUE;
+        }
+        break;
+
+    case WM_CLOSE:
+        EndDialog(hDlg, 0);
+        return (INT_PTR)TRUE;
+    }
+    return (INT_PTR)FALSE;
+}
 
 
 

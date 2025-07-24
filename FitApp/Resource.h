@@ -15,12 +15,14 @@
 #define IDD_SIGNUP                      129
 #define IDD_USERSTATS                   130
 #define IDD_SIGNIN                      132
+#define IDD_HOMESCREEN                  134
 #define IDC_USERNAME_EDIT               1001
 #define IDC_PASSWORD_EDIT               1002
 #define IDC_WEIGHTINPUT                 1004
 #define IDC_SIGNINUNAME                 1008
 #define IDC_SIGNINPASS                  1009
 #define IDC_SIGNINSUBMIT                1010
+#define IDC_LOGOUT						1011
 #define IDC_HEIGHT_SLIDER               1101
 #define IDC_HEIGHT_DISPLAY              1102
 #define IDC_STATIC                      -1
